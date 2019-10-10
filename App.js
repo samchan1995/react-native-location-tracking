@@ -22,6 +22,7 @@ import MapView, {
   PROVIDER_GOOGLE
 } from "react-native-maps";
 import haversine from "haversine";
+import Geolocation from '@react-native-community/geolocation';
 
 // const LATITUDE = 29.95539;
 // const LONGITUDE = 78.07513;
@@ -50,13 +51,44 @@ class AnimatedMarkers extends React.Component {
   }
 
   componentDidMount() {
-    const { coordinate } = this.state;
+    if (Platform.OS === 'android') {
+      this.getLocation();
+    } else {
+      this.setWatchId();
+    }
+  }
 
-    this.watchID = navigator.geolocation.watchPosition(
+  async getLocation() {
+    console.log("getLocation");
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          'title': 'Location Permission',
+          'message': 'This App needs access to your location ' +
+            'so we can know where you are.'
+        }
+      )
+      console.log(granted)
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        console.log("You can use locations ")
+        this.setWatchId()
+      } else {
+        console.log("Location permission denied")
+      }
+    } catch (err) {
+      console.warn(err)
+    }
+  }
+
+  setWatchId() {
+    const { coordinate } = this.state;
+    this.watchID = Geolocation.watchPosition(
       position => {
         const { routeCoordinates, distanceTravelled } = this.state;
         const { latitude, longitude } = position.coords;
 
+        console.log(position);
         const newCoordinate = {
           latitude,
           longitude
@@ -85,7 +117,7 @@ class AnimatedMarkers extends React.Component {
       error => console.log(error),
       {
         enableHighAccuracy: true,
-        timeout: 20000,
+        timeout: 5000,
         maximumAge: 1000,
         distanceFilter: 10
       }
@@ -93,7 +125,7 @@ class AnimatedMarkers extends React.Component {
   }
 
   componentWillUnmount() {
-    navigator.geolocation.clearWatch(this.watchID);
+    Geolocation.clearWatch(this.watchID);
   }
 
   getMapRegion = () => ({
