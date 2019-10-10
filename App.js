@@ -6,7 +6,7 @@
  * @flow
  */
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -31,144 +31,126 @@ const LONGITUDE_DELTA = 0.009;
 const LATITUDE = 37.78825;
 const LONGITUDE = -122.4324;
 
-class AnimatedMarkers extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.state = {
-      latitude: LATITUDE,
-      longitude: LONGITUDE,
-      routeCoordinates: [],
-      distanceTravelled: 0,
-      prevLatLng: {},
-      coordinate: new AnimatedRegion({
-        latitude: LATITUDE,
-        longitude: LONGITUDE,
-        latitudeDelta: 0,
-        longitudeDelta: 0
-      })
-    };
-  }
-
-  componentDidMount() {
-    if (Platform.OS === 'android') {
-      this.getLocation();
-    } else {
-      this.setWatchId();
-    }
-  }
-
-  async getLocation() {
-    console.log("getLocation");
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          'title': 'Location Permission',
-          'message': 'This App needs access to your location ' +
-            'so we can know where you are.'
-        }
-      )
-      console.log(granted)
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        console.log("You can use locations ")
-        this.setWatchId()
-      } else {
-        console.log("Location permission denied")
-      }
-    } catch (err) {
-      console.warn(err)
-    }
-  }
-
-  setWatchId() {
-    const { coordinate } = this.state;
-    this.watchID = Geolocation.watchPosition(
-      position => {
-        const { routeCoordinates, distanceTravelled } = this.state;
-        const { latitude, longitude } = position.coords;
-
-        console.log(position);
-        const newCoordinate = {
-          latitude,
-          longitude
-        };
-
-        if (Platform.OS === "android") {
-          if (this.marker) {
-            this.marker._component.animateMarkerToCoordinate(
-              newCoordinate,
-              500
-            );
-          }
-        } else {
-          coordinate.timing(newCoordinate).start();
-        }
-
-        this.setState({
-          latitude,
-          longitude,
-          routeCoordinates: routeCoordinates.concat([newCoordinate]),
-          distanceTravelled:
-            distanceTravelled + this.calcDistance(newCoordinate),
-          prevLatLng: newCoordinate
-        });
-      },
-      error => console.log(error),
+const permissionPromise = () => {
+  return new Promise(async(resolve, reject) => {
+    const permissions = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 1000,
-        distanceFilter: 10
+        'title': 'Location Permission',
+        'message': 'This App needs access to your location ' +
+          'so we can know where you are.'
       }
     );
-  }
+    if (permissions === PermissionsAndroid.RESULTS.GRANTED) resolve();
+    else reject();
+  });
+}
 
-  componentWillUnmount() {
-    Geolocation.clearWatch(this.watchID);
+const getLocation = (getter, setter, marker) => {
+  if (Platform.OS === 'android') {
+    permissionPromise().then( () => {
+      console.log("You can use locations");
+      setupWatchPosition(getter, setter, marker);
+    }).catch( () => {
+      console.log("Location permission denied")
+    } )
+  } else {
+    setupWatchPosition(getter, setter, marker);
   }
+}
 
-  getMapRegion = () => ({
-    latitude: this.state.latitude,
-    longitude: this.state.longitude,
-    latitudeDelta: LATITUDE_DELTA,
-    longitudeDelta: LONGITUDE_DELTA
+const setupWatchPosition = (getter, setter, marker) => {
+  const watchId = Geolocation.watchPosition( position => {
+    console.log('setupWatchPosition: ' + position);
+    const newCoordinate = position.coords
+    if (Platform.OS === "android") {
+        marker.current._component.animateMarkerToCoordinate(
+          newCoordinate,
+          500
+        );
+    } else {
+      getter.coordinate.timing(newCoordinate).start();
+    }
+
+    setter({
+      latitude: newCoordinate.latitude,
+      longitude: newCoordinate.longitude,
+      routeCoordinates: getter.routeCoordinates.concat([newCoordinate]),
+      distanceTravelled: getter.distanceTravelled + calcDistance(getter.prevLatLng, newCoordinate),
+      prevLatLng: newCoordinate,
+      watchId: watchId
+    })
+  }, error => console.log(error), {
+    enableHighAccuracy: false,
+    timeout: 5000,
+    maximumAge: 1000,
+    distanceFilter: 10
+  })
+}
+
+const getMapRegion = (latitude, longitude) => ({
+  latitude: latitude,
+  longitude: longitude,
+  latitudeDelta: LATITUDE_DELTA,
+  longitudeDelta: LONGITUDE_DELTA
+});
+
+const calcDistance = (prevLatLng, newLatLng) => {
+  return haversine(prevLatLng, newLatLng) || 0;
+};
+
+
+const App = () => {
+  const initArea = new AnimatedRegion({latitude: LATITUDE, longitude: LONGITUDE, latitudeDelta: 0, longitudeDelta: 0});
+  const [locations, setLocations] = useState({
+    latitude: LATITUDE,
+    longitude: LONGITUDE,
+    routeCoordinates: [],
+    distanceTravelled: 0,
+    prevLatLng: {},
+    watchId: 0
   });
 
-  calcDistance = newLatLng => {
-    const { prevLatLng } = this.state;
-    return haversine(prevLatLng, newLatLng) || 0;
-  };
+  const marker = useRef(null)
 
-  render() {
-    return (
-      <View style={styles.container}>
-        <MapView
-          style={styles.map}
-          provider={PROVIDER_GOOGLE}
-          showUserLocation
-          followUserLocation
-          loadingEnabled
-          region={this.getMapRegion()}
-        >
-          <Polyline coordinates={this.state.routeCoordinates} strokeWidth={5} />
-          <Marker.Animated
-            ref={marker => {
-              this.marker = marker;
+  useEffect( () => {
+    return function cleanup() {
+      Geolocation.clearWatch(locations.watchId)
+    };
+  })
+
+  console.log(marker);
+  getLocation(locations, setLocations, marker);
+
+
+  return (
+    <View style={styles.container}>
+      <MapView
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        showUserLocation
+        followUserLocation
+        loadingEnabled
+        region={getMapRegion(locations.latitude, locations.longitude)}
+      >
+        <Polyline coordinates={locations.routeCoordinates} strokeWidth={5} />
+        <Marker.Animated
+            ref={m => {
+              console.log("123")
+              marker.current = m
             }}
-            coordinate={this.state.coordinate}
+            coordinate={initArea}
           />
-        </MapView>
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={[styles.bubble, styles.button]}>
-            <Text style={styles.bottomBarContent}>
-              {parseFloat(this.state.distanceTravelled).toFixed(2)} km
-            </Text>
-          </TouchableOpacity>
-        </View>
+      </MapView>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={[styles.bubble, styles.button]}>
+          <Text style={styles.bottomBarContent}>
+            {parseFloat(locations.distanceTravelled).toFixed(2)} km
+          </Text>
+        </TouchableOpacity>
       </View>
-    );
-  }
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -204,4 +186,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default AnimatedMarkers;
+export default App;
