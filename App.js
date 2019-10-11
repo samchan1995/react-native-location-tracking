@@ -6,11 +6,15 @@
  * @flow
  */
 
-import React from 'react'
-import Tracker from './src/component/'
+import React, { Suspense } from 'react'
+import { Text } from 'react-native';
+
+const Tracker = React.lazy(() => import('./src/component/'));
 const App = () => {
   return (
-    <Tracker />
+    <Suspense fallback={<Text>Loading...</Text>}>
+      <Tracker />
+    </Suspense>
   );
 }
 export default App;
