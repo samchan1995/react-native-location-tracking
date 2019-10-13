@@ -32,85 +32,19 @@ const calcDistance = (prevLatLng, newLatLng) => {
     return haversine(prevLatLng, newLatLng) || 0;
 };
 
-const setupBgLocationData = (getter, setter, marker, coordinate) => {
-    BackgroundGeolocation.configure({
-        desiredAccuracy: BackgroundGeolocation.LOW_ACCURACY,
-        stationaryRadius: 0,
-        distanceFilter: 0,
-        notificationTitle: 'Background tracking',
-        notificationText: 'enabled',
-        debug: false,
-        startOnBoot: false,
-        locationProvider: BackgroundGeolocation.DISTANCE_FILTER_PROVIDER,
-        interval: 60 * 1000,
-        fastestInterval: 30 * 1000,
-        activitiesInterval: 30 * 1000
-    });
-    console.log('configure');
-
-    BackgroundGeolocation.on('authorization', (status) => {
-        console.log('[INFO] BackgroundGeolocation authorization status: ' + status);
-        if (status !== BackgroundGeolocation.AUTHORIZED) {
-            // we need to set delay or otherwise alert may not be shown
-            setTimeout(() =>
-                Alert.alert('App requires location tracking permission', 'Would you like to open app settings?', [
-                    { text: 'Yes', onPress: () => BackgroundGeolocation.showAppSettings() },
-                    { text: 'No', onPress: () => console.log('No Pressed'), style: 'cancel' }
-                ]), 1000);
-        }
-    });
-
-
-    BackgroundGeolocation.on('location', location => {
-        console.log('[DEBUG] BackgroundGeolocation location', location);
-        BackgroundGeolocation.startTask(taskKey => {
-            const newCoordinate = { latitude: location.latitude, longitude: location.longitude };
-            console.log(newCoordinate);
-            if (Platform.OS === "android") {
-                marker.current._component.animateMarkerToCoordinate(
-                    newCoordinate,
-                    500
-                );
-            } else {
-                coordinate.current.timing(newCoordinate).start();
-            }
-
-            setter({
-                latitude: newCoordinate.latitude,
-                longitude: newCoordinate.longitude,
-                routeCoordinates: getter.routeCoordinates.concat([newCoordinate]),
-                distanceTravelled: getter.distanceTravelled + calcDistance(getter.prevLatLng, newCoordinate),
-                prevLatLng: newCoordinate
-            })
-            BackgroundGeolocation.endTask(taskKey);
-        });
-    });
-
-    BackgroundGeolocation.checkStatus(status => {
-        console.log('[INFO] BackgroundGeolocation service is running', status.isRunning);
-        console.log('[INFO] BackgroundGeolocation services enabled', status.locationServicesEnabled);
-        console.log('[INFO] BackgroundGeolocation auth status: ' + status.authorization);
-
-        // you don't need to check status before start (this is just the example)
-        if (!status.isRunning) {
-            BackgroundGeolocation.start(); //triggers start on start event
-        }
-    });
-
-    console.log('start');
-}
-
 const Tracker = () => {
     console.log("Tracker")
-    const initArea = new AnimatedRegion({ latitude: LATITUDE, longitude: LONGITUDE, latitudeDelta: 0, longitudeDelta: 0 });
 
-    const [location, setLocation] = useState({
+    const [state, setState] = useState({
         latitude: LATITUDE,
         longitude: LONGITUDE,
         routeCoordinates: [],
         distanceTravelled: 0,
         prevLatLng: {}
     });
+
+    const [prevLatLng, setPrevLatLng] = useState({})
+    const [distanceTravelled, setDistanceTravelled] = useState(0)
 
     const marker = useRef(null);
 
@@ -121,19 +55,72 @@ const Tracker = () => {
         longitudeDelta: 0
     }));
 
-    const firstLoad = useRef(true);
+    const setupBgLocationData = () => {
+        BackgroundGeolocation.configure({
+            desiredAccuracy: BackgroundGeolocation.LOW_ACCURACY,
+            stationaryRadius: 20,
+            distanceFilter: 20,
+            notificationTitle: 'Background tracking',
+            notificationText: 'enabled',
+            debug: false,
+            startOnBoot: false,
+            locationProvider: BackgroundGeolocation.DISTANCE_FILTER_PROVIDER,
+            interval: 5 * 1000,
+            fastestInterval: 3 * 1000,
+            activitiesInterval: 5 * 1000
+        });
+        console.log('configure');
+    
+        BackgroundGeolocation.on('authorization', (status) => {
+            console.log('[INFO] BackgroundGeolocation authorization status: ' + status);
+            if (status !== BackgroundGeolocation.AUTHORIZED) {
+                // we need to set delay or otherwise alert may not be shown
+                setTimeout(() =>
+                    Alert.alert('App requires location tracking permission', 'Would you like to open app settings?', [
+                        { text: 'Yes', onPress: () => BackgroundGeolocation.showAppSettings() },
+                        { text: 'No', onPress: () => console.log('No Pressed'), style: 'cancel' }
+                    ]), 1000);
+            }
+        });
+    
+    
+        BackgroundGeolocation.on('location', location => {
+            console.log('[DEBUG] BackgroundGeolocation location', location);
+            BackgroundGeolocation.startTask(taskKey => {
+                const newCoordinate = { latitude: location.latitude, longitude: location.longitude };
+                console.log(newCoordinate);
+                if (Platform.OS === "android") {
+                    marker.current._component.animateMarkerToCoordinate(
+                        newCoordinate,
+                        500
+                    );
+                } else {
+                    coordinate.current.timing(newCoordinate).start();
+                }
 
+                setState(lastState => {
+                    return {
+                        latitude: newCoordinate.latitude,
+                        longitude: newCoordinate.longitude,
+                        routeCoordinates: lastState.routeCoordinates.concat([newCoordinate]),
+                        distanceTravelled: lastState.distanceTravelled + calcDistance(lastState.prevLatLng, newCoordinate),
+                        prevLatLng: newCoordinate
+                    }
+                })
+                BackgroundGeolocation.endTask(taskKey);
+            });
+        });
+    }
+    
     useEffect(() => {
-        if (firstLoad.current === true) {
-            setupBgLocationData(location, setLocation, marker, coordinate);
-            firstLoad.current = false
-        }
-        
+        setupBgLocationData()
+        BackgroundGeolocation.start();
+        console.log('start');
         return function cleanup() {
             console.log('cleanup')
-            // BackgroundGeolocation.removeAllListeners();
+            BackgroundGeolocation.removeAllListeners();
         };
-    })
+    }, [])
 
     return (
         <View style={Styles.container}>
@@ -143,9 +130,9 @@ const Tracker = () => {
                 showUserLocation
                 followUserLocation
                 loadingEnabled
-                region={getMapRegionData(location.latitude, location.longitude)}
+                region={getMapRegionData(state.latitude, state.longitude)}
             >
-                <Polyline coordinates={location.routeCoordinates} strokeWidth={5} />
+                <Polyline coordinates={state.routeCoordinates} strokeWidth={5} />
                 <Marker.Animated
                     ref={m => {
                         console.log("setting marker ref")
@@ -157,7 +144,7 @@ const Tracker = () => {
             <View style={Styles.buttonContainer}>
                 <TouchableOpacity style={[Styles.bubble, Styles.button]}>
                     <Text style={Styles.bottomBarContent}>
-                        {parseFloat(location.distanceTravelled).toFixed(2)} km
+                        {parseFloat(state.distanceTravelled).toFixed(2)} km
                     </Text>
                 </TouchableOpacity>
             </View>
