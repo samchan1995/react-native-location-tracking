@@ -18,8 +18,8 @@ import Styles from './Styles'
 
 const LATITUDE_DELTA = 0.009;
 const LONGITUDE_DELTA = 0.009;
-const LATITUDE = 37.78825;
-const LONGITUDE = -122.4324;
+const LATITUDE = 0;
+const LONGITUDE = 0;
 
 const getMapRegionData = (latitude, longitude) => ({
     latitude: latitude,
@@ -54,7 +54,7 @@ const Tracker = () => {
 
     const setupBgLocationData = () => {
         BackgroundGeolocation.configure({
-            desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
+            desiredAccuracy: BackgroundGeolocation.LOW_ACCURACY,
             stationaryRadius: 50,
             distanceFilter: 50,
             notificationTitle: 'Background tracking',
@@ -62,8 +62,9 @@ const Tracker = () => {
             debug: false,
             startOnBoot: false,
             locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
-            interval: 10 * 1000,
-            fastestInterval: 5 * 1000,
+            interval: 5 * 1000,
+            fastestInterval: 3 * 1000,
+            stopOnStillActivity: false,
         });
         console.log('configure');
 
@@ -106,6 +107,14 @@ const Tracker = () => {
                 BackgroundGeolocation.endTask(taskKey);
             });
         });
+
+        BackgroundGeolocation.on('background', () => {
+            console.log('[INFO] App is in background');
+          });
+      
+          BackgroundGeolocation.on('foreground', () => {
+            console.log('[INFO] App is in foreground');
+          });
     }
 
     useEffect(() => {
