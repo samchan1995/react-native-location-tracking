@@ -128,10 +128,15 @@ const Tracker = () => {
                 loadingEnabled
                 region={getMapRegionData(state.latitude, state.longitude)}
             >
-                {state.routeCoordinates.map((location) => {
-                    const newCoordinate = [{ latitude: location.latitude, longitude: location.longitude }];
-                    const color = location.accuracy < 50 ? 'green' : 'blue';
-                    <Polyline coordinates={newCoordinate} color={color} />
+                {state.routeCoordinates.map((location, index) => {
+                    // not using strokeColors because it only supports iOS
+                    if (index > 0) {
+                        const newCoordinate = { latitude: location.latitude, longitude: location.longitude };
+                        const color = location.accuracy < 50 ? 'green' : 'blue';
+                        const lastLocation = state.routeCoordinates[index - 1];
+                        const lastCoordinate = { latitude: lastLocation.latitude, longitude: lastLocation.longitude };
+                        return < Polyline key={location.id} coordinates={[lastCoordinate, newCoordinate]} strokeColor={color} strokeWidth={5} />
+                    }
                 })}
                 <Marker.Animated
                     ref={m => {
