@@ -57,17 +57,16 @@ const Tracker = () => {
 
     const setupBgLocationData = () => {
         BackgroundGeolocation.configure({
-            desiredAccuracy: BackgroundGeolocation.LOW_ACCURACY,
+            desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
             stationaryRadius: 20,
             distanceFilter: 20,
             notificationTitle: 'Background tracking',
             notificationText: 'enabled',
             debug: false,
             startOnBoot: false,
-            locationProvider: BackgroundGeolocation.DISTANCE_FILTER_PROVIDER,
-            interval: 5 * 1000,
-            fastestInterval: 3 * 1000,
-            activitiesInterval: 5 * 1000
+            locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
+            interval: 10 * 1000,
+            fastestInterval: 5 * 1000
         });
         console.log('configure');
     
