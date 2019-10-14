@@ -43,9 +43,6 @@ const Tracker = () => {
         prevLatLng: {}
     });
 
-    const [prevLatLng, setPrevLatLng] = useState({})
-    const [distanceTravelled, setDistanceTravelled] = useState(0)
-
     const marker = useRef(null);
 
     const coordinate = useRef(new AnimatedRegion({
@@ -58,18 +55,18 @@ const Tracker = () => {
     const setupBgLocationData = () => {
         BackgroundGeolocation.configure({
             desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
-            stationaryRadius: 20,
-            distanceFilter: 20,
+            stationaryRadius: 50,
+            distanceFilter: 50,
             notificationTitle: 'Background tracking',
             notificationText: 'enabled',
             debug: false,
             startOnBoot: false,
             locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
             interval: 10 * 1000,
-            fastestInterval: 5 * 1000
+            fastestInterval: 5 * 1000,
         });
         console.log('configure');
-    
+
         BackgroundGeolocation.on('authorization', (status) => {
             console.log('[INFO] BackgroundGeolocation authorization status: ' + status);
             if (status !== BackgroundGeolocation.AUTHORIZED) {
@@ -81,8 +78,8 @@ const Tracker = () => {
                     ]), 1000);
             }
         });
-    
-    
+
+
         BackgroundGeolocation.on('location', location => {
             console.log('[DEBUG] BackgroundGeolocation location', location);
             BackgroundGeolocation.startTask(taskKey => {
@@ -101,7 +98,7 @@ const Tracker = () => {
                     return {
                         latitude: newCoordinate.latitude,
                         longitude: newCoordinate.longitude,
-                        routeCoordinates: lastState.routeCoordinates.concat([newCoordinate]),
+                        routeCoordinates: lastState.routeCoordinates.concat([location]),
                         distanceTravelled: lastState.distanceTravelled + calcDistance(lastState.prevLatLng, newCoordinate),
                         prevLatLng: newCoordinate
                     }
@@ -110,7 +107,7 @@ const Tracker = () => {
             });
         });
     }
-    
+
     useEffect(() => {
         setupBgLocationData()
         BackgroundGeolocation.start();
@@ -131,7 +128,11 @@ const Tracker = () => {
                 loadingEnabled
                 region={getMapRegionData(state.latitude, state.longitude)}
             >
-                <Polyline coordinates={state.routeCoordinates} strokeWidth={5} />
+                {state.routeCoordinates.map((location) => {
+                    const newCoordinate = [{ latitude: location.latitude, longitude: location.longitude }];
+                    const color = location.accuracy < 50 ? 'green' : 'blue';
+                    <Polyline coordinates={newCoordinate} color={color} />
+                })}
                 <Marker.Animated
                     ref={m => {
                         console.log("setting marker ref")
