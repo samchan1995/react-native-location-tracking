@@ -73,11 +73,13 @@ const Tracker = () => {
             console.log('[INFO] BackgroundGeolocation authorization status: ' + status);
             if (status !== BackgroundGeolocation.AUTHORIZED) {
                 // we need to set delay or otherwise alert may not be shown
-                setTimeout(() =>
+                setTimeout(() => {
                     Alert.alert('App requires location tracking permission', 'Would you like to open app settings?', [
                         { text: 'Yes', onPress: () => BackgroundGeolocation.showAppSettings() },
                         { text: 'No', onPress: () => console.log('No Pressed'), style: 'cancel' }
-                    ]), 1000);
+                    ]);
+                    permissionHasDenied.current = true;
+                }, 1000);
             }
         });
 
@@ -115,8 +117,17 @@ const Tracker = () => {
 
         BackgroundGeolocation.on('foreground', () => {
             console.log('[INFO] App is in foreground');
+            if (permissionHasDenied.current == true) {
+                console.log('Try to restart');
+                BackgroundGeolocation.stop();
+                BackgroundGeolocation.start();
+                permissionHasDenied.current = false;
+            }
+            console.log('start');
         });
     }
+
+    const permissionHasDenied = useRef(false);
 
     useEffect(() => {
         setupBgLocationData()
