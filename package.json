@@ -9,7 +9,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@mauron85/react-native-background-geolocation": "^0.6.3",
+    "@mauron85/react-native-background-geolocation": "https://github.com/samchan1995/react-native-background-geolocation.git",
     "haversine": "^1.1.1",
     "hoek": "^6.1.3",
     "lodash": "^4.17.15",

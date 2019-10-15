@@ -65,6 +65,7 @@ const Tracker = () => {
             interval: 5 * 1000,
             fastestInterval: 3 * 1000,
             stopOnStillActivity: false,
+            startForeground: true
         });
         console.log('configure');
 
@@ -110,11 +111,11 @@ const Tracker = () => {
 
         BackgroundGeolocation.on('background', () => {
             console.log('[INFO] App is in background');
-          });
-      
-          BackgroundGeolocation.on('foreground', () => {
+        });
+
+        BackgroundGeolocation.on('foreground', () => {
             console.log('[INFO] App is in foreground');
-          });
+        });
     }
 
     useEffect(() => {
@@ -144,7 +145,7 @@ const Tracker = () => {
                         const color = location.accuracy < 50 ? 'green' : 'blue';
                         const lastLocation = state.routeCoordinates[index - 1];
                         const lastCoordinate = { latitude: lastLocation.latitude, longitude: lastLocation.longitude };
-                        return < Polyline key={location.id} coordinates={[lastCoordinate, newCoordinate]} strokeColor={color} strokeWidth={5} />
+                        return <Polyline key={location.id} coordinates={[lastCoordinate, newCoordinate]} strokeColor={color} strokeWidth={5} />
                     }
                 })}
                 <Marker.Animated
